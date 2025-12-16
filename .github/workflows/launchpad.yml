@@ -1,0 +1,124 @@
+# Copyright 2022 Espressif Systems (Shanghai) PTE LTD
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This workflow build examples, store the artifacts and deploy them to github pages.
+# Generates the launchpad configuration file that can be used with the url.
+
+name: "Build products and deploy launchpad"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  # delete-old-artifacts:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Delete old artifacts
+  #       uses: geekyeggo/delete-artifact@v2
+  #       with:
+  #         name: build-images-* # Delete all artifacts with name starting with build-images-
+
+  job1:
+    name: "Build Speaker"
+    # needs: [delete-old-artifacts]
+    runs-on: ubuntu-latest
+    container: espressif/idf:release-v5.5
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+      - run: mkdir -p images
+      - name: Get product version
+        shell: bash
+        run: |
+          PRODUCT_VERSION=$(.github/tools/get_example_version.sh products/speaker)
+          echo "PRODUCT_VERSION=$PRODUCT_VERSION" >> $GITHUB_ENV
+          echo "Product version: $PRODUCT_VERSION"
+      - name: Get boards name
+        shell: bash
+        run: |
+          BOARDS_NAME=$(.github/tools/get_boards_name.sh products/speaker)
+          echo "BOARDS_NAME=$BOARDS_NAME" >> $GITHUB_ENV
+          echo "All boards name: $BOARDS_NAME"
+      - name: Build product
+        shell: bash
+        run: |
+          cd products/speaker
+          . ${IDF_PATH}/export.sh
+          for board in $BOARDS_NAME; do
+            idf.py -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.ci.board.${board}" set-target esp32s3 && idf.py build
+            pushd build
+            esptool.py --chip esp32s3 merge_bin -o "$GITHUB_WORKSPACE/images/speaker_${PRODUCT_VERSION}_${board}.bin" @flash_args
+            popd
+            rm -rf sdkconfig build managed_components dependencies.lock
+          done
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-images-speaker
+          path: images/
+          overwrite: true
+
+  deploy:
+    needs: [job1]
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-images-*
+          path: images/
+          merge-multiple: true
+
+      - name: generate launchpad config
+        run: |
+          cd images/
+          ls *
+          $GITHUB_WORKSPACE/.github/tools/generate_launchpad_config.sh $GITHUB_REPOSITORY
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: images/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

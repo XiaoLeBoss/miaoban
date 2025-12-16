@@ -1,0 +1,9 @@
+.gitlab/tools/check_executables.py
+.gitlab/tools/check_readme_links.py
+.gitlab/tools/push_to_github.sh
+
+.github/tools/get_example_version.sh
+.github/tools/generate_launchpad_config.sh
+.github/tools/get_boards_name.sh
+
+.gitlab/tools/run_test_apps.py

@@ -1,0 +1,108 @@
+# Note: All operators are binary operators. For more than two operands, you may use the nested parentheses trick.
+# For example:
+#    *  A == 1 or (B == 2 and C in [1,2,3])
+#    *  (A == 1 and B == 2) or (C not in ["3", "4", 5])
+
+# Componet test_apps
+# test_apps:
+#   enable:
+#     - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# Products
+products/phone/phone_m5stack_core_s3:
+  enable:
+    - if: IDF_TARGET in ["esp32s3"] and (IDF_VERSION_MAJOR == 5 and IDF_VERSION_MINOR >= 4)
+
+products/phone/phone_p4_function_ev_board:
+  enable:
+    - if: IDF_TARGET in ["esp32p4"]
+
+products/phone/phone_s3_box_3:
+  enable:
+    - if: IDF_TARGET in ["esp32s3"]
+
+products/phone/phone_s3_lcd_ev_board:
+  enable:
+    - if: IDF_TARGET in ["esp32s3"]
+
+products/speaker:
+  enable:
+    - if: IDF_TARGET in ["esp32s3"] and (IDF_VERSION_MAJOR == 5 and IDF_VERSION_MINOR >= 5)
+
+#
+# Test Apps
+#
+# brookesia_lib_utils: check
+utils/brookesia_lib_utils/test_apps/check:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: function_guard
+utils/brookesia_lib_utils/test_apps/function_guard:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: describe_helpers
+utils/brookesia_lib_utils/test_apps/describe_helpers:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: log
+utils/brookesia_lib_utils/test_apps/log:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: memory_profiler
+utils/brookesia_lib_utils/test_apps/memory_profiler:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: plugin
+utils/brookesia_lib_utils/test_apps/plugin:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: state_machine
+utils/brookesia_lib_utils/test_apps/state_machine:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: task_scheduler
+utils/brookesia_lib_utils/test_apps/task_scheduler:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: thread_config
+utils/brookesia_lib_utils/test_apps/thread_config:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: thread_profiler
+utils/brookesia_lib_utils/test_apps/thread_profiler:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_lib_utils: time_profiler
+utils/brookesia_lib_utils/test_apps/time_profiler:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_service_manager
+service/brookesia_service_manager/test_apps:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_service_nvs
+service/brookesia_service_nvs/test_apps:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_service_wifi: general
+service/brookesia_service_wifi/test_apps/general:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
+
+# brookesia_service_wifi: with_nvs
+service/brookesia_service_wifi/test_apps/with_nvs:
+  enable:
+    - if: IDF_TARGET in ["esp32s3", "esp32p4"]
