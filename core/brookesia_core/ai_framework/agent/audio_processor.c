@@ -397,8 +397,7 @@ static void esp_gmf_afe_event_cb(esp_gmf_obj_handle_t obj, esp_gmf_afe_evt_t *ev
             printf("trun off light\r\n");
         }
         break;
-        
-    }
+        }
     }
 }
 #endif /* CONFIG_KEY_PRESS_DIALOG_MODE */
