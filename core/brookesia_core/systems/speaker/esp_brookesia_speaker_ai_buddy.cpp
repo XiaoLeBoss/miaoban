@@ -11,6 +11,7 @@
 #endif
 #include "private/esp_brookesia_speaker_utils.hpp"
 #include "esp_brookesia_speaker_ai_buddy.hpp"
+#include "ai_framework/agent/audio_processor.h"
 
 #define AUDIO_EVENT_THREAD_NAME                 "audio_event"
 #define AUDIO_EVENT_THREAD_STACK_SIZE           (10 * 1024)
@@ -609,7 +610,11 @@ bool AI_Buddy::processAudioEvent(AudioProcessInfo &info)
         return true;
     }
 
-    // If the audio is playing other audio, use the interval time of the audio as the timeout time
+    if (audio_manager_is_suspended()) {
+        info.last_play_time_ms = esp_timer_get_time() / 1000;
+        return true;
+    }
+
     int64_t timeout_ms = 0;
     if (_audio_playing_type != AudioType::Max) {
         auto it_playing = _audio_file_map.find(_audio_playing_type);

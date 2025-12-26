@@ -79,6 +79,7 @@ public:
     static constexpr const char *SETTINGS_WLAN_SWITCH = "wlan_switch";
     static constexpr const char *SETTINGS_WLAN_SSID = "wlan_ssid";
     static constexpr const char *SETTINGS_WLAN_PASSWORD = "wlan_password";
+    static constexpr const char *SETTINGS_BLUFI_SWITCH = "blufi_switch";
 
     Display &display;
     const Data &data;
@@ -162,3 +163,4 @@ using ManagerScreen [[deprecated("Use `esp_brookesia::systems::speaker::Manager:
 #define SETTINGS_NVS_KEY_WLAN_SWITCH   esp_brookesia::systems::speaker::Manager::SETTINGS_WLAN_SWITCH
 #define SETTINGS_NVS_KEY_WLAN_SSID     esp_brookesia::systems::speaker::Manager::SETTINGS_WLAN_SSID
 #define SETTINGS_NVS_KEY_WLAN_PASSWORD esp_brookesia::systems::speaker::Manager::SETTINGS_WLAN_PASSWORD
+#define SETTINGS_NVS_KEY_BLUFI_SWITCH  esp_brookesia::systems::speaker::Manager::SETTINGS_BLUFI_SWITCH

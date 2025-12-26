@@ -114,6 +114,7 @@ static audio_manager_t audio_manager;
 static audio_recordert_t audio_recorder;
 static audio_playback_t audio_playback;
 static audio_prompt_t audio_prompt;
+static bool audio_suspended = false;
 
 /*
  * 功能：初始化音频管理器，完成外设与编解码设备的创建与注册
@@ -173,7 +174,14 @@ esp_err_t audio_manager_deinit()
  */
 esp_err_t audio_manager_suspend(bool suspend)
 {
-    return esp_gmf_afe_manager_suspend(audio_recorder.afe_manager, suspend);
+    audio_suspended = suspend;
+#ifndef CONFIG_KEY_PRESS_DIALOG_MODE
+    if (audio_recorder.afe_manager)
+    {
+        return esp_gmf_afe_manager_suspend(audio_recorder.afe_manager, suspend);
+    }
+#endif /* CONFIG_KEY_PRESS_DIALOG_MODE */
+    return ESP_OK;
 }
 
 /*
@@ -397,7 +405,7 @@ static void esp_gmf_afe_event_cb(esp_gmf_obj_handle_t obj, esp_gmf_afe_evt_t *ev
             printf("trun off light\r\n");
         }
         break;
-        }
+    }
     }
 }
 #endif /* CONFIG_KEY_PRESS_DIALOG_MODE */
@@ -430,6 +438,11 @@ esp_err_t audio_gmf_trigger_wakeup()
  */
 esp_err_t audio_recorder_open(recorder_event_callback_t cb, void *ctx)
 {
+    if (audio_suspended)
+    {
+        ESP_LOGW(TAG, "Audio recorder is suspended");
+        return ESP_FAIL;
+    }
     esp_gmf_rb_create(1, 1024 * 3, &out_rb);
 #if CONFIG_KEY_PRESS_DIALOG_MODE
     (void)cb;
@@ -551,13 +564,42 @@ esp_err_t audio_recorder_close(void)
         return ESP_OK;
     }
 #ifndef CONFIG_KEY_PRESS_DIALOG_MODE
-    esp_gmf_pipeline_destroy(audio_recorder.pipe);
-    esp_gmf_task_deinit(audio_recorder.task);
-    afe_config_free(audio_recorder.afe_cfg);
-    esp_gmf_afe_manager_destroy(audio_recorder.afe_manager);
+    if (audio_recorder.pipe)
+    {
+        esp_gmf_pipeline_destroy(audio_recorder.pipe);
+        audio_recorder.pipe = NULL;
+    }
+    if (audio_recorder.task)
+    {
+        esp_gmf_task_deinit(audio_recorder.task);
+        audio_recorder.task = NULL;
+    }
+    if (audio_recorder.afe_cfg)
+    {
+        afe_config_free(audio_recorder.afe_cfg);
+        audio_recorder.afe_cfg = NULL;
+    }
+    if (audio_recorder.afe_manager)
+    {
+        esp_gmf_afe_manager_destroy(audio_recorder.afe_manager);
+        audio_recorder.afe_manager = NULL;
+    }
 #endif /* CONFIG_KEY_PRESS_DIALOG_MODE */
     audio_recorder.state = AUDIO_PLAYER_STATE_CLOSED;
     return ESP_OK;
+}
+
+esp_err_t audio_recorder_reopen(void)
+{
+#if CONFIG_KEY_PRESS_DIALOG_MODE
+    return ESP_OK;
+#else
+    if (audio_recorder.state != AUDIO_PLAYER_STATE_CLOSED)
+    {
+        return ESP_OK;
+    }
+    return audio_recorder_open(audio_recorder.cb, audio_recorder.ctx);
+#endif /* CONFIG_KEY_PRESS_DIALOG_MODE */
 }
 
 /*
@@ -575,6 +617,11 @@ esp_err_t audio_recorder_read_data(uint8_t *data, int data_size)
     esp_codec_dev_read(audio_manager.rec_dev, data, data_size);
     return data_size;
 #else
+    if (audio_suspended || (audio_recorder.state == AUDIO_PLAYER_STATE_CLOSED) || (out_rb == NULL))
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        return 0;
+    }
     // 从环形缓冲区读取编码后的数据块，供上层网络或存储使用
     esp_gmf_data_bus_block_t blk;
     blk.buf = malloc(data_size);
@@ -696,6 +743,11 @@ static int playback_event_callback(esp_asp_event_pkt_t *event, void *ctx)
  */
 esp_err_t audio_playback_open(void)
 {
+    if (audio_suspended)
+    {
+        ESP_LOGW(TAG, "Audio playback is suspended");
+        return ESP_FAIL;
+    }
     esp_err_t err = ESP_GMF_ERR_OK;
 
     do
@@ -761,6 +813,16 @@ esp_err_t audio_playback_close(void)
     {
         audio_playback_stop();
     }
+    if (audio_playback.player == NULL)
+    {
+        audio_playback.state = AUDIO_PLAYER_STATE_CLOSED;
+        if (audio_playback.fifo)
+        {
+            esp_gmf_fifo_destroy(audio_playback.fifo);
+            audio_playback.fifo = NULL;
+        }
+        return ESP_OK;
+    }
     esp_err_t err = esp_audio_simple_player_destroy(audio_playback.player);
     if (err != ESP_OK)
     {
@@ -768,6 +830,12 @@ esp_err_t audio_playback_close(void)
         return ESP_FAIL;
     }
     audio_playback.state = AUDIO_PLAYER_STATE_CLOSED;
+    audio_playback.player = NULL;
+    if (audio_playback.fifo)
+    {
+        esp_gmf_fifo_destroy(audio_playback.fifo);
+        audio_playback.fifo = NULL;
+    }
     return ESP_OK;
 }
 
@@ -779,10 +847,20 @@ esp_err_t audio_playback_close(void)
  */
 esp_err_t audio_playback_run(void)
 {
+    if (audio_suspended)
+    {
+        ESP_LOGW(TAG, "Audio playback is suspended");
+        return ESP_FAIL;
+    }
     if (audio_playback.state == AUDIO_PLAYER_STATE_PLAYING)
     {
         ESP_LOGW(TAG, "Audio playback is realdy running");
         return ESP_OK;
+    }
+    if (audio_playback.player == NULL)
+    {
+        ESP_LOGE(TAG, "Audio playback not opened");
+        return ESP_FAIL;
     }
     esp_asp_music_info_t music_info;
     music_info.sample_rate = 16000;
@@ -830,6 +908,10 @@ esp_err_t audio_playback_stop(void)
  */
 esp_err_t audio_prompt_open(void)
 {
+    if (audio_suspended)
+    {
+        return ESP_FAIL;
+    }
     esp_asp_cfg_t cfg = {
         .in.cb = NULL,
         .in.user_ctx = NULL,
@@ -845,6 +927,11 @@ esp_err_t audio_prompt_open(void)
 
 esp_err_t audio_prompt_close(void)
 {
+    if (audio_prompt.player == NULL)
+    {
+        audio_prompt.state = AUDIO_PLAYER_STATE_CLOSED;
+        return ESP_OK;
+    }
     if (audio_prompt.state == AUDIO_PLAYER_STATE_PLAYING)
     {
         esp_audio_simple_player_stop(audio_prompt.player);
@@ -856,15 +943,26 @@ esp_err_t audio_prompt_close(void)
         return ESP_FAIL;
     }
     audio_prompt.state = AUDIO_PLAYER_STATE_CLOSED;
+    audio_prompt.player = NULL;
     return ESP_OK;
 }
 
 esp_err_t audio_prompt_play(const char *url)
 {
+    if (audio_suspended)
+    {
+        ESP_LOGW(TAG, "audio_prompt suspended");
+        return ESP_FAIL;
+    }
     if (audio_prompt.state == AUDIO_PLAYER_STATE_PLAYING)
     {
         ESP_LOGE(TAG, "audio_prompt is already playing");
         return ESP_OK;
+    }
+    if (audio_prompt.player == NULL)
+    {
+        ESP_LOGE(TAG, "audio_prompt not opened");
+        return ESP_FAIL;
     }
     esp_audio_simple_player_run(audio_prompt.player, url, NULL);
     audio_prompt.state = AUDIO_PLAYER_STATE_PLAYING;
@@ -885,6 +983,11 @@ esp_err_t audio_prompt_stop(void)
 
 esp_err_t audio_prompt_play_with_block(const char *url, int timeout_ms)
 {
+    if (audio_suspended)
+    {
+        ESP_LOGW(TAG, "audio_prompt suspended");
+        return ESP_FAIL;
+    }
     ESP_LOGI(TAG, "audio_prompt_play_with_block, url: %s, timeout_ms: %d", url, timeout_ms);
 
     if (timeout_ms < 0)
@@ -920,4 +1023,9 @@ esp_err_t audio_prompt_play_mute(bool enable_mute)
 
     esp_codec_dev_set_out_mute(audio_manager.play_dev, enable_mute);
     return ESP_OK;
+}
+
+bool audio_manager_is_suspended()
+{
+    return audio_suspended;
 }

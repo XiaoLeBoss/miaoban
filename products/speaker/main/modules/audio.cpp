@@ -23,7 +23,7 @@ using namespace esp_brookesia::services;
 static esp_codec_dev_handle_t play_dev = nullptr;
 static esp_codec_dev_handle_t rec_dev = nullptr;
 
-bool audio_init()
+extern "C" bool audio_init()
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 

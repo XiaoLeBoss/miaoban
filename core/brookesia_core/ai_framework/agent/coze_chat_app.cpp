@@ -23,6 +23,7 @@
 #include "esp_coze_utils.h"
 #include "http_client_request.h"
 #include "cJSON.h"
+#include "mbedtls/base64.h"
 #include "boost/thread.hpp"
 #include "private/esp_brookesia_ai_agent_utils.hpp"
 #include "audio_processor.h"
@@ -126,7 +127,7 @@ void CozeChatAgentInfo::dump() const
  * 使用示例：
  *   if (!info.isValid()) {  处理错误  }
  */
-    bool CozeChatAgentInfo::isValid() const
+bool CozeChatAgentInfo::isValid() const
 {
     return !session_name.empty() && !device_id.empty() && !user_id.empty() && !app_id.empty() &&
            !public_key.empty() && !private_key.empty();
@@ -729,13 +730,36 @@ static void audio_data_read_task(void *pv)
 
     uint8_t *data = (uint8_t *)esp_gmf_oal_calloc(1, AUDIO_RECORDER_READ_SIZE);
     int ret = 0;
+    size_t base64_len = 0;
+    unsigned char *base64_data = NULL;
+    size_t output_len = 0;
+
     while (true)
     {
         ret = audio_recorder_read_data(data, AUDIO_RECORDER_READ_SIZE);
         // 仅在聊天启动、处于唤醒态、未暂停/未休眠、且当前非说话态时上传音频
         if (coze_chat->chat_start && coze_chat->wakeup && !coze_chat->chat_pause && !coze_chat->chat_sleep && !coze_chat->speaking)
         {
-            esp_coze_chat_send_audio_data(coze_chat->chat, (char *)data, ret);
+            // Calculate required buffer size for Base64 (4 * (n + 2) / 3) + 1 for null terminator
+            base64_len = ((ret + 2) / 3) * 4 + 1;
+            base64_data = (unsigned char *)esp_gmf_oal_calloc(1, base64_len);
+
+            if (base64_data)
+            {
+                if (mbedtls_base64_encode(base64_data, base64_len, &output_len, data, ret) == 0)
+                {
+                    esp_coze_chat_send_audio_data(coze_chat->chat, (char *)base64_data, output_len);
+                }
+                else
+                {
+                    ESP_UTILS_LOGE("Base64 encode failed");
+                }
+                esp_gmf_oal_free(base64_data);
+            }
+            else
+            {
+                ESP_UTILS_LOGE("Failed to allocate memory for base64 data");
+            }
         }
         // heap_caps_check_integrity_all(true);
     }
@@ -768,7 +792,7 @@ static void audio_pipe_open(void)
  * 使用示例：
  *   ESP_ERROR_CHECK(coze_chat_app_init());
  */
-esp_err_t coze_chat_app_init(void)
+extern "C" esp_err_t coze_chat_app_init(void)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 
@@ -804,7 +828,7 @@ esp_err_t coze_chat_app_init(void)
  *  - robot_info：机器人配置（bot/voice）
  * 返回：ESP_OK 表示启动成功；ESP_FAIL 表示失败
  */
-esp_err_t coze_chat_app_start(const CozeChatAgentInfo &agent_info, const CozeChatRobotInfo &robot_info)
+extern "C" esp_err_t coze_chat_app_start(const CozeChatAgentInfo &agent_info, const CozeChatRobotInfo &robot_info)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 
@@ -858,7 +882,7 @@ esp_err_t coze_chat_app_start(const CozeChatAgentInfo &agent_info, const CozeCha
  * 参数：无
  * 返回：ESP_OK 表示成功；其它错误码表示失败
  */
-esp_err_t coze_chat_app_stop(void)
+extern "C" esp_err_t coze_chat_app_stop(void)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 
@@ -881,7 +905,7 @@ esp_err_t coze_chat_app_stop(void)
  * 参数：无
  * 返回：无
  */
-void coze_chat_app_resume(void)
+extern "C" void coze_chat_app_resume(void)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 
@@ -893,7 +917,7 @@ void coze_chat_app_resume(void)
  * 参数：无
  * 返回：无
  */
-void coze_chat_app_pause(void)
+extern "C" void coze_chat_app_pause(void)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 
@@ -912,7 +936,7 @@ void coze_chat_app_pause(void)
  * 参数：无
  * 返回：无
  */
-void coze_chat_app_wakeup(void)
+extern "C" void coze_chat_app_wakeup(void)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 
@@ -925,7 +949,7 @@ void coze_chat_app_wakeup(void)
  * 参数：无
  * 返回：无
  */
-void coze_chat_app_sleep(void)
+extern "C" void coze_chat_app_sleep(void)
 {
     ESP_UTILS_LOG_TRACE_GUARD();
 

@@ -50,18 +50,17 @@ extern boost::signals2::signal<void(int code)> coze_chat_error_signal;
  *       - ESP_OK  On success
  *       - Other   Appropriate esp_err_t error code on failure
  */
+#ifdef __cplusplus
+extern "C" {
+#endif
 esp_err_t coze_chat_app_init(void);
-
 esp_err_t coze_chat_app_start(const CozeChatAgentInfo &agent_info, const CozeChatRobotInfo &robot_info);
-
 esp_err_t coze_chat_app_stop(void);
-
 void coze_chat_app_resume(void);
-
 void coze_chat_app_pause(void);
-
 void coze_chat_app_wakeup(void);
-
 void coze_chat_app_sleep(void);
-
 void coze_chat_app_interrupt(void);
+#ifdef __cplusplus
+}
+#endif

@@ -18,11 +18,14 @@ file(GLOB_RECURSE UI_SRCS_CPP ${UI_SRC_DIR}/*.cpp)
 list(APPEND SRCS_C ${UI_SRCS_C})
 list(APPEND SRCS_CPP ${UI_SRCS_CPP})
 
+# Exclude SoftAP provisioning sources from build
+list(REMOVE_ITEM SRCS_CPP ${PROJ_SRC_DIR}/app_ap_conf.cpp)
+list(REMOVE_ITEM SRCS_CPP ${UI_SRC_DIR}/screens/wlan_softap.cpp)
+
 idf_component_register(
     SRCS ${SRCS_C} ${SRCS_CPP}
     INCLUDE_DIRS ${PROJ_SRC_DIR}
-    REQUIRES esp_event esp_wifi esp_http_server json spi_flash
-    EMBED_TXTFILES ${PROJ_SRC_DIR}/html/wifi.html
+    REQUIRES esp_event esp_wifi json spi_flash
     WHOLE_ARCHIVE
 )
 
